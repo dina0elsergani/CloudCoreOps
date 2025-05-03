@@ -1,0 +1,20 @@
+---
+# tasks file for app role
+- name: Deploy application
+  hosts: "{{ app_hosts | default('all') }}"
+  become: true
+  tasks:
+    - name: Pull latest Docker image
+      docker_image:
+        name: "{{ dockerhub_username }}/cloudcoreops"
+        source: pull
+    - name: Run application container
+      docker_container:
+        name: "{{ app_name }}"
+        image: "{{ dockerhub_username }}/cloudcoreops:latest"
+        state: started
+        restart_policy: always
+        env:
+          ENV: "{{ app_env }}"
+        published_ports:
+          - "{{ app_port }}:5000"
