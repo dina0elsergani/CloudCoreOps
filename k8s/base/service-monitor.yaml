@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloudcoreops-app
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: cloudcoreops-app
+  endpoints:
+    - port: http
+      path: /health
+      interval: 15s 

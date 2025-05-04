@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: cloudcoreops-app
+spec:
+  replicas: 3
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: {duration: 5m}
+        - setWeight: 100
+  selector:
+    matchLabels:
+      app: cloudcoreops-app
+  template:
+    metadata:
+      labels:
+        app: cloudcoreops-app
+    spec:
+      containers:
+        - name: app
+          image: dina0elsergani/cloudcoreops:latest 

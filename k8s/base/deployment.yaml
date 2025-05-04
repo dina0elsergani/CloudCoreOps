@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudcoreops-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudcoreops-app
+  template:
+    metadata:
+      labels:
+        app: cloudcoreops-app
+    spec:
+      containers:
+        - name: app
+          image: dina0elsergani/cloudcoreops:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: FLASK_ENV
+              value: production 
