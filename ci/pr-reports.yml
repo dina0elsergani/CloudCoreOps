@@ -1,0 +1,22 @@
+name: PR Reports
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  infracost:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Infracost PR Comment
+        uses: infracost/actions/comment@v2
+        with:
+          path: infra/envs/dev
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Trivy PR Comment
+        run: |
+          trivy image dina0elsergani/cloudcoreops:latest --format template --template "@contrib/github_comment.tpl" > trivy-report.md
+          gh pr comment ${{ github.event.pull_request.number }} --body-file trivy-report.md 

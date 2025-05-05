@@ -1,0 +1,11 @@
+name: Infracost
+on: [pull_request]
+jobs:
+  infracost:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v2
+      - name: Run Infracost
+        run: infracost breakdown --path=infra/envs/dev 

@@ -1,0 +1,15 @@
+name: Chaos Test
+on:
+  schedule:
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+jobs:
+  chaos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Apply LitmusChaos
+        run: kubectl apply -f scripts/chaos/litmus-pod-failure.yaml
+      - name: Check Recovery
+        run: |
+          kubectl wait --for=condition=available --timeout=120s deployment/cloudcoreops-app 

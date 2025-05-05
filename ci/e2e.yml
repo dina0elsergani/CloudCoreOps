@@ -1,0 +1,20 @@
+name: E2E Tests
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types:
+      - completed
+    branches: [staging]
+jobs:
+  cypress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install Cypress
+        run: npm install cypress
+      - name: Run Cypress
+        run: npx cypress run 

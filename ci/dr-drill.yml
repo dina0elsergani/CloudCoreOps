@@ -1,0 +1,14 @@
+name: DR Drill
+on:
+  workflow_dispatch:
+jobs:
+  dr-drill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Trigger RDS Snapshot
+        run: aws rds create-db-snapshot --db-instance-identifier cloudcoreops-db --db-snapshot-identifier dr-drill-$(date +%s)
+      - name: Restore RDS from Snapshot
+        run: aws rds restore-db-instance-from-db-snapshot --db-instance-identifier cloudcoreops-db-drill --db-snapshot-identifier dr-drill-$(date +%s)
+      - name: Report Success
+        run: echo "DR Drill completed" 
