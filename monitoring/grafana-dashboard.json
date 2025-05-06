@@ -1,0 +1,14 @@
+{
+  "dashboard": {
+    "title": "CloudCoreOps App Overview",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "App Health Checks",
+        "targets": [
+          {"expr": "up{job=\"cloudcoreops-app\"}", "legendFormat": "Health"}
+        ]
+      }
+    ]
+  }
+} 

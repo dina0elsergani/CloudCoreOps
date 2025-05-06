@@ -1,0 +1,11 @@
+serviceMonitors:
+  enabled: true
+  additionalServiceMonitors:
+    - name: cloudcoreops-app
+      selector:
+        matchLabels:
+          app: cloudcoreops-app
+      endpoints:
+        - port: http
+          path: /health
+          interval: 15s 
