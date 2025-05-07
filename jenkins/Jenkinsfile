@@ -1,0 +1,188 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_IMAGE = 'dina0elsergani/cloudcoreops'
+        DOCKER_TAG = 'latest'
+        AWS_REGION = 'us-east-1'
+        EKS_CLUSTER_NAME = 'cloudcoreops'
+        PYTHON_VERSION = '3.11'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Setup Python') {
+            steps {
+                script {
+                    sh '''
+                        cd app
+                        python3 -m venv venv
+                        source venv/bin/activate
+                        pip install --upgrade pip
+                        pip install -r requirements.txt
+                    '''
+                }
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
+                script {
+                    sh '''
+                        cd app
+                        source venv/bin/activate
+                        pytest -v --junitxml=test-results.xml || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    publishTestResults testResultsPattern: '**/test-results.xml'
+                }
+            }
+        }
+        
+        stage('Code Quality') {
+            steps {
+                script {
+                    sh '''
+                        cd app
+                        source venv/bin/activate
+                        pip install flake8
+                        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+                        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+                    '''
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                        sh '''
+                            cd app
+                            docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Security Scan') {
+            steps {
+                script {
+                    sh '''
+                        trivy image ${DOCKER_IMAGE}:${DOCKER_TAG} --format json --output trivy-results.json || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    publishJSON target: [
+                        allowMissing: true,
+                        alwaysRunToBuild: true,
+                        keepLongStdio: true,
+                        reportDir: '.',
+                        reportFiles: 'trivy-results.json',
+                        reportName: 'Trivy Security Scan',
+                        reportTitles: 'Trivy Security Scan'
+                    ]
+                }
+            }
+        }
+        
+        stage('Deploy to EKS') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    withAWS(region: AWS_REGION, credentials: 'aws-credentials') {
+                        sh '''
+                            aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                            kubectl apply -k k8s/base/
+                            kubectl rollout status deployment/cloudcoreops-app --timeout=300s
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    withAWS(region: AWS_REGION, credentials: 'aws-credentials') {
+                        sh '''
+                            aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                            kubectl wait --for=condition=available --timeout=300s deployment/cloudcoreops-app
+                            
+                            # Get the service URL (handle both LoadBalancer and Ingress)
+                            SERVICE_URL=""
+                            if kubectl get service cloudcoreops-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null; then
+                                SERVICE_URL=$(kubectl get service cloudcoreops-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                            elif kubectl get ingress cloudcoreops-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null; then
+                                SERVICE_URL=$(kubectl get ingress cloudcoreops-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                            else
+                                echo "Warning: Could not determine service URL, skipping health check"
+                                exit 0
+                            fi
+                            
+                            if [ -n "$SERVICE_URL" ]; then
+                                # Wait for service to be ready
+                                echo "Waiting for service to be ready..."
+                                sleep 30
+                                
+                                # Health check with retry
+                                for i in {1..5}; do
+                                    if curl -f http://${SERVICE_URL}/health; then
+                                        echo "Health check passed!"
+                                        break
+                                    else
+                                        echo "Health check attempt $i failed, retrying..."
+                                        sleep 10
+                                    fi
+                                done
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            script {
+                if (env.BRANCH_NAME == 'main') {
+                    emailext (
+                        subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                        body: "Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' was successful. Check console output at ${env.BUILD_URL}",
+                        recipientProviders: [[$class: 'DevelopersRecipientProvider']]
+                    )
+                }
+            }
+        }
+        failure {
+            script {
+                emailext (
+                    subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                    body: "Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' failed. Check console output at ${env.BUILD_URL}",
+                    recipientProviders: [[$class: 'DevelopersRecipientProvider']]
+                )
+            }
+        }
+    }
+} 

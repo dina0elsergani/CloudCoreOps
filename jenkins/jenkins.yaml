@@ -1,0 +1,90 @@
+jenkins:
+  systemMessage: "CloudCoreOps Jenkins CI/CD Server"
+  numExecutors: 2
+  scmCheckoutRetryCount: 3
+  mode: NORMAL
+  
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin123}"
+  
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        - "Overall/Administer:admin"
+        - "Overall/Read:authenticated"
+        - "Job/Build:authenticated"
+        - "Job/Read:authenticated"
+  
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "DOCKER_IMAGE"
+            value: "dina0elsergani/cloudcoreops"
+          - key: "AWS_REGION"
+            value: "us-east-1"
+          - key: "EKS_CLUSTER_NAME"
+            value: "cloudcoreops"
+
+tool:
+  git:
+    installations:
+      - name: "Default"
+        home: "git"
+  docker:
+    installations:
+      - name: "Docker"
+        home: "/usr/bin/docker"
+  python:
+    installations:
+      - name: "Python3"
+        home: "/usr/bin/python3"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "dockerhub-credentials"
+              username: "${DOCKERHUB_USERNAME}"
+              password: "${DOCKERHUB_PASSWORD}"
+              description: "DockerHub credentials"
+          - aws:
+              scope: GLOBAL
+              id: "aws-credentials"
+              accessKey: "${AWS_ACCESS_KEY_ID}"
+              secretKey: "${AWS_SECRET_ACCESS_KEY}"
+              description: "AWS credentials for EKS deployment"
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github-credentials"
+              username: "${GITHUB_USERNAME}"
+              password: "${GITHUB_TOKEN}"
+              description: "GitHub credentials for repository access"
+
+jobs:
+  - script: |
+      pipelineJob('cloudcoreops-pipeline') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/dina0elsergani/CloudCoreOps.git')
+                  credentials('github-credentials')
+                }
+                branch('main')
+              }
+            }
+            scriptPath('jenkins/Jenkinsfile')
+          }
+        }
+        triggers {
+          scm('H/5 * * * *')
+        }
+        description('CloudCoreOps CI/CD Pipeline')
+      } 

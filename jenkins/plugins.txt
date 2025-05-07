@@ -1,0 +1,14 @@
+# Jenkins plugins required for CloudCoreOps CI/CD pipeline
+workflow-aggregator:latest
+git:latest
+docker-workflow:latest
+aws-credentials:latest
+kubernetes:latest
+pipeline-utility-steps:latest
+email-ext:latest
+junit:latest
+htmlpublisher:latest
+sonar:latest
+trivy-scanner:latest
+blueocean:latest
+credentials-binding:latest 
