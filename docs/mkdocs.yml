@@ -1,0 +1,9 @@
+site_name: CloudCoreOps Docs
+nav:
+  - Home: index.md
+  - ADRs:
+      - "ADR 1": adr/0001-record.md
+      - "ADR 2": adr/0002-record.md
+      - "ADR 3": adr/0003-record.md
+  - Disaster Recovery: disaster-recovery.md
+theme: material 

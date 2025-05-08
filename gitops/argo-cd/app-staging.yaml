@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudcoreops-staging
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/dina0elsergani/CloudCoreOps.git'
+    path: k8s/overlays/staging
+    targetRevision: staging
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true 

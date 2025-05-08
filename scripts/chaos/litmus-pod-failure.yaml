@@ -1,0 +1,16 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: pod-failure
+spec:
+  appinfo:
+    appns: dev
+    applabel: 'app=cloudcoreops-app'
+    appkind: deployment
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '30' 
