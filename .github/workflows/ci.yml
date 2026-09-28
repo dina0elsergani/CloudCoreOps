@@ -89,6 +89,20 @@ jobs:
           terraform_version: '1.9.5'
       - name: Format check
         run: terraform fmt -check -recursive infra/
+      # Root-only validation misses local modules entirely: nothing calls them,
+      # so broken references in them never surface. Validate each directory.
+      - name: Validate every module
+        run: |
+          status=0
+          for dir in $(find infra -name '*.tf' -exec dirname {} \; | sort -u); do
+            echo "::group::$dir"
+            if ! (cd "$dir" && terraform init -backend=false -input=false >/dev/null && terraform validate); then
+              echo "::error file=$dir::terraform validate failed"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $status
       - uses: terraform-linters/setup-tflint@v4
         with:
           tflint_version: v0.52.0
