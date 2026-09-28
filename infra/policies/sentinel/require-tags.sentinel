@@ -1,6 +1,0 @@
-import "tfplan"
-main = rule {
-  all tfplan.resources as _, r {
-    "tags" in r.applied and "Environment" in r.applied.tags
-  }
-} 

@@ -107,23 +107,28 @@ different claims.
 
 - Flask service with health, info, feature-flag and Prometheus `/metrics` endpoints
 - Container image: non-root (UID 10001), gunicorn, `HEALTHCHECK`
-- Terraform passes `validate` against a pinned AWS provider (`~> 5.60`)
-- All three Kustomize overlays render; CI enforces that they keep rendering
+- Every Terraform directory passes `validate` against a pinned AWS provider
+  (`~> 5.60`), including the local modules -- CI checks each one, because a root
+  module cannot validate code nothing calls
+- All three Kustomize overlays render; CI enforces that they keep rendering and
+  that every Argo CD `path:` resolves
 - Deployment sets resource requests (without which the HPA cannot scale),
   liveness and readiness probes, and a hardened `securityContext`
+- Prometheus rules and the Grafana dashboard query the metric names the exporter
+  actually emits (`flask_http_request_*`)
 
 **Reference material, not battle-tested**
 
-These are small, illustrative configurations. They show the shape of a solution
-and have not been run against a live cluster:
+Written and internally consistent, but never run against a live cluster:
 
 - Argo Rollouts canary spec (`k8s/base/rollout.yaml`)
 - Vault CSI `SecretProviderClass` (`k8s/base/secret-provider.yaml`)
 - Jaeger sidecar (`monitoring/tracing/`)
-- OPA/Gatekeeper and Sentinel policy samples (`infra/policies/`)
+- OPA/Gatekeeper constraint (`infra/policies/opa/`)
 - LitmusChaos experiment (`scripts/chaos/`)
-- Terratest VPC test (`infra/tests/terratest/`)
-- Architecture decision records (`docs/adr/`)
+- Cross-region replica and Route 53 failover (`infra/cross-region/`)
+- Terratest for the root module (`infra/tests/terratest/`) -- it applies real
+  infrastructure, so it is deliberately outside CI
 
 **Not implemented**
 
