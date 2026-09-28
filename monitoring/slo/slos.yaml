@@ -1,17 +1,50 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: slos
+  name: cloudcoreops-slos
+  labels:
+    release: prometheus
 spec:
   groups:
-    - name: slos
+    - name: cloudcoreops.rules
       rules:
-        - record: slo:latency:99th
-          expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
-        - alert: HighErrorRate
-          expr: sum(rate(http_requests_total{status=~"5.."}[5m])) > 1
+        # Metric names come from prometheus-flask-exporter, which prefixes
+        # everything with flask_.
+        - record: cloudcoreops:latency_seconds:p99
+          expr: >-
+            histogram_quantile(0.99, sum by (le) (
+              rate(flask_http_request_duration_seconds_bucket[5m])
+            ))
+
+        - record: cloudcoreops:error_ratio:5m
+          expr: >-
+            sum(rate(flask_http_request_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(flask_http_request_total[5m])), 0.001)
+
+    - name: cloudcoreops.alerts
+      rules:
+        # Ratio-based, so a burst of errors on low traffic does not page.
+        - alert: HighErrorRatio
+          expr: cloudcoreops:error_ratio:5m > 0.05
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: Over 5% of requests failing for 10 minutes
+            runbook: docs/disaster-recovery.md
+
+        - alert: HighLatencyP99
+          expr: cloudcoreops:latency_seconds:p99 > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: p99 latency above 1s for 10 minutes
+
+        - alert: NoHealthyPods
+          expr: sum(up{job=~".*cloudcoreops.*"}) == 0
           for: 5m
           labels:
             severity: critical
           annotations:
-            summary: "High error rate detected" 
+            summary: No healthy application pods reporting
