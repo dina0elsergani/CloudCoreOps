@@ -1,150 +1,143 @@
-# CloudCoreOps: DevOps Portfolio Project
+# CloudCoreOps
 
-## About Me
+[![CI](https://github.com/dina0elsergani/CloudCoreOps/actions/workflows/ci.yml/badge.svg)](https://github.com/dina0elsergani/CloudCoreOps/actions/workflows/ci.yml)
 
-Hi! I'm Dina Elsergani, a DevOps engineer passionate about automation, cloud-native infrastructure, and SRE best practices. This project is my hands-on showcase for employers—built, tested, and documented entirely by me.
+A reference implementation of a containerised service on AWS EKS, wired end to end:
+Terraform for infrastructure, Kustomize overlays per environment, Argo CD for GitOps
+delivery, and Prometheus for metrics.
 
-- LinkedIn: [linkedin.com/in/dina0elsergani](https://linkedin.com/in/dina0elsergani)
-- Email: dina0elsergani@gmail.com
+It is built to be forked. Nothing in `k8s/base/` hardcodes a registry or an account,
+CI runs green with no configured secrets, and container images publish to the fork
+owner's own GitHub Container Registry namespace.
 
-## Why This Project?
+## Architecture
 
-I wanted to prove my ability to design, build, and operate a production-grade cloud platform from scratch. Every feature here—from GitOps to chaos engineering—was chosen to demonstrate job-ready skills. I built this project iteratively, learning from each failed deploy and CI error. See the commit history for my troubleshooting and improvements!
-
-[![CI](https://github.com/dina0elsergani/CloudCoreOps/actions/workflows/github-actions.yml/badge.svg)](https://github.com/dina0elsergani/CloudCoreOps/actions)
-[![Trivy](https://github.com/dina0elsergani/CloudCoreOps/actions/workflows/trivy.yml/badge.svg)](https://github.com/dina0elsergani/CloudCoreOps/actions)
-[![TFLint](https://github.com/dina0elsergani/CloudCoreOps/actions/workflows/tflint.yml/badge.svg)](https://github.com/dina0elsergani/CloudCoreOps/actions)
-[![Checkov](https://github.com/dina0elsergani/CloudCoreOps/actions/workflows/checkov.yml/badge.svg)](https://github.com/dina0elsergani/CloudCoreOps/actions)
-[![Infracost](https://github.com/dina0elsergani/CloudCoreOps/actions/workflows/infracost.yml/badge.svg)](https://github.com/dina0elsergani/CloudCoreOps/actions)
-[![Coverage](https://github.com/dina0elsergani/CloudCoreOps/actions/workflows/coverage.yml/badge.svg)](https://github.com/dina0elsergani/CloudCoreOps/actions)
-
----
-
-## Advanced Features
-- Multi-environment IaC & Kustomize overlays (dev/staging/prod)
-- GitOps with Argo CD (auto branch-based deploys)
-- Terratest, TFLint, Checkov, Trivy, Infracost in CI
-- OPA/Gatekeeper & Sentinel policies for compliance
-- SLOs, Prometheus, Jaeger tracing, Alertmanager
-- Vault CSI driver for secrets, least-privilege IAM
-- Canary/Blue-Green with Argo Rollouts
-- Feature flags (Unleash)
-- Chaos engineering (LitmusChaos)
-- Automated RDS backups & DR playbook
-- MkDocs site & ADRs for architecture decisions
-- Horizontal Pod Autoscaler (HPA) for auto-scaling microservices
-- Ansible role for reusable, multi-environment app deployments
-- Jenkins CI/CD pipeline with Docker and Kubernetes integration
-
----
-
-## Overview
-Deploy a containerized microservice to a managed Kubernetes cluster in AWS using Terraform, Docker, Kubernetes, CI/CD, and monitoring.
-
-## Tech Stack
-- Terraform (IaC)
-- Docker
-- Kubernetes (EKS)
-- GitHub Actions (CI/CD)
-- Jenkins (Alternative CI/CD)
-- Prometheus & Grafana (Monitoring)
-- AWS KMS (Secrets)
-- Python (Flask)
-
-## Folder Structure
 ```
-CloudCoreOps/
-│
-├── app/                # Microservice source code (Python Flask)
-├── infra/              # Terraform IaC for AWS resources
-├── k8s/                # Kubernetes manifests (Kustomize)
-├── ci/                 # CI/CD pipeline definitions (GitHub Actions)
-├── jenkins/            # Jenkins CI/CD configuration
-├── monitoring/         # Prometheus, Grafana, alerting configs
-├── scripts/            # Helper scripts (setup, teardown, etc.)
-├── docs/               # Documentation and ADRs
-├── README.md           # Full documentation
-└── .gitignore
+                      ┌───────────────────────────────┐
+   git push ─────────▶│  GitHub Actions (CI)          │
+                      │  test · kustomize · scan      │
+                      │  build image ──▶ ghcr.io      │
+                      └───────────────┬───────────────┘
+                                      │ image tag
+                                      ▼
+   git commit ──▶ Argo CD ──▶ ┌──────────────────────┐
+                              │  EKS cluster         │
+   ALB / Ingress ────────────▶│  Flask app (HPA 2-10)│──▶ RDS PostgreSQL
+                              │  ServiceMonitor      │──▶ Prometheus
+                              └──────────────────────┘
 ```
 
-## Prerequisites
-- AWS CLI configured
-- Terraform
-- kubectl
-- Docker
-- Python 3.11+
+## Layout
 
-## Setup
+| Path | Contents |
+|------|----------|
+| `app/` | Flask service, Dockerfile, tests |
+| `infra/` | Terraform (VPC, EKS, RDS), Ansible roles, policy samples |
+| `k8s/base/` | Base manifests — no registry or environment baked in |
+| `k8s/overlays/` | `dev`, `staging`, `prod` — namespace, replicas, image tag, TLS |
+| `gitops/argo-cd/` | One Argo CD `Application` per environment |
+| `monitoring/` | Prometheus SLOs, Grafana dashboard, alert rules |
+| `jenkins/` | Equivalent pipeline for a Jenkins-based setup |
+| `.github/workflows/` | `ci.yml` (automatic) and `deploy.yml` (manual) |
 
-### 1. Provision Infrastructure
+## Quick start
+
+Run the service and its tests locally:
+
 ```sh
-cd infra/
+cd app
+pip install -r requirements-dev.txt
+pytest                      # 5 tests
+python app.py               # http://localhost:5000
+```
+
+Endpoints: `/` · `/health` · `/api/info` · `/api/features` · `/metrics`
+
+Render any environment without a cluster:
+
+```sh
+kustomize build k8s/overlays/dev
+```
+
+## Deploying
+
+Provision infrastructure, then apply an overlay:
+
+```sh
+cd infra
 terraform init
-terraform apply
+terraform apply             # requires AWS credentials
+
+kubectl apply -k k8s/overlays/dev
 ```
 
-### 2. Build & Push Docker Image
+Images are published by CI to `ghcr.io/<owner>/cloudcoreops`. To point an overlay
+somewhere else, edit its `images:` block — base manifests stay untouched.
+
+For GitOps, apply the Argo CD `Application` for the environment:
+
 ```sh
-cd app/
-docker build -t dina0elsergani/cloudcoreops:latest .
-docker push dina0elsergani/cloudcoreops:latest
+kubectl apply -f gitops/argo-cd/app-dev.yaml
 ```
 
-### 3. Deploy to Kubernetes
-```sh
-cd k8s/
-kubectl apply -k base/
-```
+## CI
 
-### 4. Set Up Monitoring
-```sh
-# Deploy Prometheus and Grafana using Helm or manifests in monitoring/
-```
+`ci.yml` runs on every push and pull request and needs **no repository secrets**:
 
-### 5. Access the App
-- Find the LoadBalancer/Ingress endpoint via `kubectl get ingress` or AWS console.
+| Job | Checks |
+|-----|--------|
+| `test` | pytest with coverage, fails under 80% |
+| `manifests` | every overlay renders; every Argo CD `path:` exists on disk |
+| `security` | Trivy filesystem scan, Checkov IaC scan |
+| `terraform` | `fmt -check`, TFLint |
+| `image` | builds the container; pushes to GHCR only on `main` |
 
-## CI/CD Pipeline
-- Automated via GitHub Actions: build → test → Dockerize → deploy → monitor.
-- See `ci/github-actions.yml` for details.
+Pull requests build the image but never push, so forks need no credentials.
 
-## Security
-- Secrets managed via AWS KMS or Vault (see k8s/base/secret.yaml for placeholder).
-- IAM roles and service accounts follow least-privilege principle.
+`deploy.yml` is `workflow_dispatch` only. It assumes an AWS role via OIDC rather
+than storing long-lived keys, and fails fast with a readable message if the
+environment's secrets are not configured.
 
-## Teardown
-```sh
-cd infra/
-terraform destroy
-```
+## Scope and status
 
-## Diagrams
+Honest accounting, because "it's in the repo" and "it's production-ready" are
+different claims.
 
-### Architecture
-```
-[User] -> [AWS ALB/Ingress] -> [EKS Cluster] -> [Flask App Pod]
-                                 |-> [RDS]
-                                 |-> [Prometheus/Grafana]
-                                 |-> [AWS KMS]
-```
+**Working and verified**
 
-### CI/CD Flow
-```
-[GitHub Push] -> [GitHub Actions: Build/Test] -> [Docker Build/Push] -> [Deploy to EKS] -> [Monitor]
-```
+- Flask service with health, info, feature-flag and Prometheus `/metrics` endpoints
+- Container image: non-root (UID 10001), gunicorn, `HEALTHCHECK`
+- Terraform passes `validate` against a pinned AWS provider (`~> 5.60`)
+- All three Kustomize overlays render; CI enforces that they keep rendering
+- Deployment sets resource requests (without which the HPA cannot scale),
+  liveness and readiness probes, and a hardened `securityContext`
 
-## Getting Started
+**Reference material, not battle-tested**
 
-This project is configured for local testing using `localhost` as the domain in all relevant configs and tests. For production or cloud deployment, replace `localhost` with your real domain or public IP in the following files:
+These are small, illustrative configurations. They show the shape of a solution
+and have not been run against a live cluster:
 
-- `k8s/base/ingress-tls.yaml`
-- `k6/loadtest.js`
-- `monitoring/uptime/uptime-check.sh`
-- `cypress/e2e/health.spec.js`
+- Argo Rollouts canary spec (`k8s/base/rollout.yaml`)
+- Vault CSI `SecretProviderClass` (`k8s/base/secret-provider.yaml`)
+- Jaeger sidecar (`monitoring/tracing/`)
+- OPA/Gatekeeper and Sentinel policy samples (`infra/policies/`)
+- LitmusChaos experiment (`scripts/chaos/`)
+- Terratest VPC test (`infra/tests/terratest/`)
+- Architecture decision records (`docs/adr/`)
 
-For Let's Encrypt TLS, also update your real email in `k8s/base/cert-manager.yaml`.
+**Not implemented**
 
-**Never commit real secrets or webhooks.** Use environment variables or secret managers for sensitive data.
+- Feature flags are a small in-process implementation (`app/feature_flags/`),
+  not a managed service
+- No cost analysis in CI
+- `cert-manager.yaml` needs a real email address before it will issue certificates
+
+## Secrets
+
+No secrets are committed. `k8s/base/secret.example.yaml` is a template and is
+deliberately excluded from every kustomization; real values belong in the Vault
+CSI provider or your cloud's secret manager.
 
 ## License
-MIT
+
+MIT — see [LICENSE](LICENSE).
