@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cloudcoreops-app
+  labels:
+    app: cloudcoreops-app
 spec:
   replicas: 2
   selector:
@@ -12,11 +14,52 @@ spec:
       labels:
         app: cloudcoreops-app
     spec:
+      serviceAccountName: cloudcoreops-app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: app
-          image: dina0elsergani/cloudcoreops:latest
+          # Overlays rewrite this via the kustomize `images:` transformer.
+          image: cloudcoreops:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 5000
+            - name: http
+              containerPort: 5000
           env:
-            - name: FLASK_ENV
-              value: production 
+            - name: ENVIRONMENT
+              value: base
+          # The HPA scales on CPU utilisation, which is computed as a percentage
+          # of the request -- without requests set, it cannot scale at all.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

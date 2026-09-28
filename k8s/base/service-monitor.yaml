@@ -10,5 +10,5 @@ spec:
       app: cloudcoreops-app
   endpoints:
     - port: http
-      path: /health
+      path: /metrics
       interval: 15s 

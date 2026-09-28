@@ -20,4 +20,4 @@ spec:
     spec:
       containers:
         - name: app
-          image: dina0elsergani/cloudcoreops:latest 
+          image: cloudcoreops:latest 
