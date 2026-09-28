@@ -6,8 +6,8 @@ output "eks_cluster_endpoint" {
   value = module.eks.cluster_endpoint
 }
 
-output "eks_cluster_kubeconfig" {
-  value = module.eks.kubeconfig
+output "eks_cluster_certificate_authority_data" {
+  value     = module.eks.cluster_certificate_authority_data
   sensitive = true
 }
 
