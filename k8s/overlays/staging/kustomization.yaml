@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cloudcoreops-staging
+
+resources:
+  - ../../base
+
+images:
+  - name: cloudcoreops
+    newName: ghcr.io/dina0elsergani/cloudcoreops
+    newTag: staging
+
+replicas:
+  - name: cloudcoreops-app
+    count: 2
+
+patches:
+  - path: patch-env.yaml
