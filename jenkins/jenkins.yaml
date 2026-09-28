@@ -23,7 +23,7 @@ jenkins:
     - envVars:
         env:
           - key: "DOCKER_IMAGE"
-            value: "dina0elsergani/cloudcoreops"
+            value: "ghcr.io/dina0elsergani/cloudcoreops"
           - key: "AWS_REGION"
             value: "us-east-1"
           - key: "EKS_CLUSTER_NAME"

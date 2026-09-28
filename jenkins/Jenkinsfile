@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_IMAGE = 'dina0elsergani/cloudcoreops'
+        DOCKER_IMAGE = 'ghcr.io/dina0elsergani/cloudcoreops'
         DOCKER_TAG = 'latest'
         AWS_REGION = 'us-east-1'
         EKS_CLUSTER_NAME = 'cloudcoreops'

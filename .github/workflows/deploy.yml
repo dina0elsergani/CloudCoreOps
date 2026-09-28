@@ -1,0 +1,42 @@
+name: Deploy
+
+# Manual only. Deployment needs cloud credentials and a live cluster, so it must
+# never run unattended on a fork or a pull request.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required secrets are configured
+        run: |
+          : "${AWS_ROLE_ARN:?set the AWS_ROLE_ARN secret on this environment}"
+          : "${EKS_CLUSTER_NAME:?set the EKS_CLUSTER_NAME secret on this environment}"
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+      # OIDC role assumption -- no long-lived access keys stored in the repo.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - uses: azure/setup-kubectl@v4
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region "${{ vars.AWS_REGION || 'us-east-1' }}" --name "${{ secrets.EKS_CLUSTER_NAME }}"
+      - name: Apply overlay
+        run: kubectl apply -k "k8s/overlays/${{ inputs.environment }}"
+      - name: Wait for rollout
+        run: kubectl -n "cloudcoreops-${{ inputs.environment }}" rollout status deployment/cloudcoreops-app --timeout=5m
