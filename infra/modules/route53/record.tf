@@ -1,7 +1,7 @@
-resource "aws_route53_record" "staging" {
+resource "aws_route53_record" "this" {
   zone_id = var.zone_id
-  name    = "staging"
+  name    = var.record_name
   type    = "CNAME"
-  ttl     = 300
-  records = [aws_lb.ingress.dns_name]
-} 
+  ttl     = var.ttl
+  records = [var.target_dns_name]
+}

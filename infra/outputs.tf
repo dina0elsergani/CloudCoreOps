@@ -17,4 +17,8 @@ output "rds_endpoint" {
 
 output "vpc_id" {
   value = module.vpc.vpc_id
-} 
+}
+output "aws_region" {
+  description = "Region the stack is deployed in; scripts/setup.sh reads this"
+  value       = var.aws_region
+}
